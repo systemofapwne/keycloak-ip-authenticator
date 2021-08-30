@@ -23,7 +23,7 @@ public class IPAuthenticator implements Authenticator {
         String remoteIPAddress = context.getConnection().getRemoteAddr();
         String allowedIPAddress = getAllowedIPAddress(context);
 
-        if (!allowedIPAddress.equals(remoteIPAddress)) {
+        if (!(new IpAddressMatcher(allowedIPAddress).matches(remoteIPAddress))) {
             logger.infof("IPs do not match. Realm %s expected %s but user %s logged from %s", realm.getName(), allowedIPAddress, user.getUsername(), remoteIPAddress);
             UserCredentialManager credentialManager = session.userCredentialManager();
 
