@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.models.*;
 import org.keycloak.models.credential.OTPCredentialModel;
@@ -21,25 +22,41 @@ public class IPAuthenticator implements Authenticator {
         UserModel user = context.getUser();
 
         String remoteIPAddress = context.getConnection().getRemoteAddr();
-        String allowedIPAddress = getAllowedIPAddress(context);
+        String allowedIPAddresses = getAllowedIPAddresses(context); // Comma separated list of allowed IP-Addresses in CIDR notation
 
-        if (!(new IpAddressMatcher(allowedIPAddress).matches(remoteIPAddress))) {
-            logger.infof("IPs do not match. Realm %s expected %s but user %s logged from %s", realm.getName(), allowedIPAddress, user.getUsername(), remoteIPAddress);
-            UserCredentialManager credentialManager = session.userCredentialManager();
-
-            if (!credentialManager.isConfiguredFor(realm, user, OTPCredentialModel.TYPE)) {
-                user.addRequiredAction(UserModel.RequiredAction.CONFIGURE_TOTP);
+        //Check against all valid CIDR addresses
+        boolean validIP = false;
+        for(String CIDR : allowedIPAddresses.split("[\\s,;]+")){
+            if(new IpAddressMatcher(CIDR).matches(remoteIPAddress)){
+                validIP = true;
+                break;
             }
-
-            user.setAttribute(IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE, Collections.singletonList("force"));
-        } else {
-            user.setAttribute(IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE, Collections.singletonList("skip"));
         }
 
+        if(user == null){   //No user context?: This plugin is used as a conditional before user validation. Fail, when IP is out of range. Succeed, when in range.
+            if(!validIP){
+                logger.infof("IPs do not match. Realm %s expected %s but IP was %s", realm.getName(), allowedIPAddresses, remoteIPAddress);
+                context.failure(AuthenticationFlowError.INVALID_CLIENT_CREDENTIALS);
+                return;
+            }
+        } else {            //User context vailable?: This plugin is now meant to work together with conditional OTP. It will always succeed but also set the field stored in IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE to "skip" or "force" like the original addon
+            if(validIP){
+                user.setAttribute(IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE, Collections.singletonList("skip"));
+            } else {
+                logger.infof("IPs do not match. Realm %s expected %s but user %s logged in from %s", realm.getName(), allowedIPAddresses, user.getUsername(), remoteIPAddress);
+
+                UserCredentialManager credentialManager = session.userCredentialManager();
+                if (!credentialManager.isConfiguredFor(realm, user, OTPCredentialModel.TYPE)) {
+                    user.addRequiredAction(UserModel.RequiredAction.CONFIGURE_TOTP);
+                }
+
+                user.setAttribute(IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE, Collections.singletonList("force"));
+            }
+        }
         context.success();
     }
 
-    private String getAllowedIPAddress(AuthenticationFlowContext context) {
+    private String getAllowedIPAddresses(AuthenticationFlowContext context) {
         AuthenticatorConfigModel configModel = context.getAuthenticatorConfig();
         Map<String, String> config = configModel.getConfig();
         return config.get(IPAuthenticatorFactory.ALLOWED_IP_ADDRESS_CONFIG);
@@ -51,7 +68,7 @@ public class IPAuthenticator implements Authenticator {
 
     @Override
     public boolean requiresUser() {
-        return true;
+        return false;
     }
 
     @Override
