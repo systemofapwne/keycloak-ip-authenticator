@@ -1,29 +1,8 @@
-# Copyright 2021 Soarinferret
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+FROM maven:latest AS builder
+WORKDIR /build/
+# IP Auth Plugin
+RUN git clone https://github.com/systemofapwne/keycloak-ip-authenticator.git /build/ipauth && cd /build/ipauth && mvn package
 
-FROM jboss/keycloak:15.0.2 as build
-
-COPY . /ip-authenticator
-
-USER 0
-
-RUN cd /tmp && \
-    curl --output maven.tar.gz https://dlcdn.apache.org/maven/maven-3/3.8.2/binaries/apache-maven-3.8.2-bin.tar.gz && \
-    tar xvf maven.tar.gz && \
-    cd /ip-authenticator && \
-    /tmp/apache-maven-3.8.2/bin/mvn package
-
-FROM jboss/keycloak:15.0.2
-
-COPY --from=build /ip-authenticator/target/keycloak-ip-authenticator.jar /opt/jboss/keycloak/standalone/deployments/
+FROM jboss/keycloak:latest
+# IP Auth Plugin
+COPY --from=builder /build/ipauth/target/keycloak-ip-authenticator.jar      /opt/jboss/keycloak/standalone/deployments/keycloak-ip-authenticator.jar
