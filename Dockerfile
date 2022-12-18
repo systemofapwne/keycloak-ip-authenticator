@@ -1,7 +1,7 @@
 FROM maven:latest AS builder
 WORKDIR /build/
 # IP Auth Plugin
-RUN git clone https://github.com/systemofapwne/keycloak-ip-authenticator.git /build/ipauth && cd /build/ipauth && mvn package
+RUN git clone https://github.com/systemofapwne/keycloak-ip-authenticator.git /build/ipauth && cd /build/ipauth && mvn clean install
 
 FROM jboss/keycloak:latest
 # IP Auth Plugin
