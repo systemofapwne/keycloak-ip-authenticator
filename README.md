@@ -15,7 +15,7 @@ Make sure that Keycloak SPI dependencies and your Keycloak server versions match
 To build the project execute the following command:
 
 ```bash
-mvn package
+mvn clean package
 ```
 
 ## deploy
