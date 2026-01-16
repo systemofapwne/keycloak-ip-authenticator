@@ -17,7 +17,6 @@ public class IPAuthenticator implements Authenticator {
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
-        KeycloakSession session = context.getSession();
         RealmModel realm = context.getRealm();
         UserModel user = context.getUser();
 
@@ -39,13 +38,13 @@ public class IPAuthenticator implements Authenticator {
                 context.failure(AuthenticationFlowError.INVALID_CLIENT_CREDENTIALS);
                 return;
             }
-        } else {            //User context vailable?: This plugin is now meant to work together with conditional OTP. It will always succeed but also set the field stored in IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE to "skip" or "force" like the original addon
+        } else {            //User context available?: This plugin is now meant to work together with conditional OTP. It will always succeed but also set the field stored in IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE to "skip" or "force" like the original addon
             if(validIP){
                 user.setAttribute(IP_BASED_OTP_CONDITIONAL_USER_ATTRIBUTE, Collections.singletonList("skip"));
             } else {
                 logger.infof("IPs do not match. Realm %s expected %s but user %s logged in from %s", realm.getName(), allowedIPAddresses, user.getUsername(), remoteIPAddress);
 
-                SubjectCredentialManager credentialManager = user.credentialManager();
+                UserCredentialManager credentialManager = (UserCredentialManager) user.credentialManager();
                 if (!credentialManager.isConfiguredFor(OTPCredentialModel.TYPE)) {
                     user.addRequiredAction(UserModel.RequiredAction.CONFIGURE_TOTP);
                 }
